@@ -1,0 +1,328 @@
+{
+  "dashboard": {
+    "name": "E-commerce Analytics Dashboard",
+    "description": "Comprehensive analytics dashboard for e-commerce business intelligence",
+    "version": "1.0",
+    "data_sources": [
+      {
+        "name": "Customer Analytics",
+        "type": "S3",
+        "location": "s3://your-bucket-name/analytics/customers/",
+        "format": "Parquet",
+        "description": "Customer segmentation and lifetime value data"
+      },
+      {
+        "name": "Product Analytics", 
+        "type": "S3",
+        "location": "s3://your-bucket-name/analytics/products/",
+        "format": "Parquet",
+        "description": "Product performance and sales metrics"
+      },
+      {
+        "name": "Sales Analytics",
+        "type": "S3", 
+        "location": "s3://your-bucket-name/analytics/sales/",
+        "format": "Parquet",
+        "description": "Sales trends and order analytics"
+      },
+      {
+        "name": "RDS Direct Connection",
+        "type": "RDS",
+        "connection": "ecommerce-mysql-connection",
+        "description": "Direct connection to RDS MySQL database"
+      }
+    ],
+    "sheets": [
+      {
+        "name": "Executive Summary",
+        "description": "High-level KPIs and business metrics",
+        "visuals": [
+          {
+            "type": "KPI",
+            "title": "Total Revenue",
+            "data_source": "Sales Analytics",
+            "field": "total_amount",
+            "aggregation": "SUM",
+            "format": "currency"
+          },
+          {
+            "type": "KPI", 
+            "title": "Total Customers",
+            "data_source": "Customer Analytics",
+            "field": "customer_id",
+            "aggregation": "COUNT_DISTINCT",
+            "format": "number"
+          },
+          {
+            "type": "KPI",
+            "title": "Average Order Value",
+            "data_source": "Sales Analytics", 
+            "field": "total_amount",
+            "aggregation": "AVG",
+            "format": "currency"
+          },
+          {
+            "type": "KPI",
+            "title": "Total Orders",
+            "data_source": "Sales Analytics",
+            "field": "order_id", 
+            "aggregation": "COUNT",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "name": "Customer Analytics",
+        "description": "Customer segmentation and behavior analysis",
+        "visuals": [
+          {
+            "type": "Bar Chart",
+            "title": "Revenue by Customer Segment",
+            "data_source": "Customer Analytics",
+            "x_axis": "customer_segment",
+            "y_axis": "total_spent",
+            "aggregation": "SUM",
+            "color": "customer_segment"
+          },
+          {
+            "type": "Pie Chart",
+            "title": "Customer Distribution by Segment",
+            "data_source": "Customer Analytics",
+            "category": "customer_segment",
+            "value": "customer_id",
+            "aggregation": "COUNT_DISTINCT"
+          },
+          {
+            "type": "Scatter Plot",
+            "title": "Customer Value vs Lifespan",
+            "data_source": "Customer Analytics",
+            "x_axis": "customer_lifespan_days",
+            "y_axis": "total_spent",
+            "color": "value_tier",
+            "size": "total_spent"
+          },
+          {
+            "type": "Table",
+            "title": "Top Customers by Value",
+            "data_source": "Customer Analytics",
+            "columns": [
+              "full_name",
+              "customer_segment", 
+              "total_spent",
+              "customer_lifespan_days",
+              "is_active_customer"
+            ],
+            "sort": "total_spent",
+            "sort_order": "desc",
+            "limit": 20
+          }
+        ]
+      },
+      {
+        "name": "Product Analytics",
+        "description": "Product performance and sales analysis",
+        "visuals": [
+          {
+            "type": "Bar Chart",
+            "title": "Top Products by Revenue",
+            "data_source": "Product Analytics",
+            "x_axis": "product_name",
+            "y_axis": "total_revenue",
+            "aggregation": "SUM",
+            "sort": "total_revenue",
+            "sort_order": "desc",
+            "limit": 15
+          },
+          {
+            "type": "Pie Chart", 
+            "title": "Revenue by Category",
+            "data_source": "Product Analytics",
+            "category": "category",
+            "value": "total_revenue",
+            "aggregation": "SUM"
+          },
+          {
+            "type": "Scatter Plot",
+            "title": "Rating vs Revenue",
+            "data_source": "Product Analytics",
+            "x_axis": "avg_rating",
+            "y_axis": "total_revenue",
+            "color": "rating_category",
+            "size": "total_quantity_sold"
+          },
+          {
+            "type": "Table",
+            "title": "Product Performance Summary",
+            "data_source": "Product Analytics",
+            "columns": [
+              "product_name",
+              "category",
+              "brand",
+              "total_revenue",
+              "avg_rating",
+              "total_quantity_sold",
+              "profit_margin",
+              "is_bestseller"
+            ],
+            "sort": "total_revenue",
+            "sort_order": "desc"
+          }
+        ]
+      },
+      {
+        "name": "Sales Trends",
+        "description": "Sales performance and trend analysis",
+        "visuals": [
+          {
+            "type": "Line Chart",
+            "title": "Monthly Sales Trend",
+            "data_source": "Sales Analytics",
+            "x_axis": "order_date",
+            "y_axis": "total_amount",
+            "aggregation": "SUM",
+            "group_by": "order_month"
+          },
+          {
+            "type": "Bar Chart",
+            "title": "Sales by Quarter",
+            "data_source": "Sales Analytics", 
+            "x_axis": "order_quarter",
+            "y_axis": "total_amount",
+            "aggregation": "SUM",
+            "color": "order_year"
+          },
+          {
+            "type": "Heat Map",
+            "title": "Sales by Day of Week and Hour",
+            "data_source": "Sales Analytics",
+            "x_axis": "order_hour",
+            "y_axis": "order_day_of_week",
+            "value": "total_amount",
+            "aggregation": "SUM"
+          },
+          {
+            "type": "Funnel Chart",
+            "title": "Order Status Funnel",
+            "data_source": "Sales Analytics",
+            "stages": [
+              "Pending",
+              "Processing", 
+              "Shipped",
+              "Delivered"
+            ],
+            "value": "order_id",
+            "aggregation": "COUNT"
+          }
+        ]
+      },
+      {
+        "name": "Geographic Analysis",
+        "description": "Sales performance by geographic location",
+        "visuals": [
+          {
+            "type": "Map",
+            "title": "Sales by State",
+            "data_source": "RDS Direct Connection",
+            "location_field": "state",
+            "value_field": "total_amount",
+            "aggregation": "SUM"
+          },
+          {
+            "type": "Bar Chart",
+            "title": "Top States by Revenue",
+            "data_source": "RDS Direct Connection",
+            "x_axis": "state",
+            "y_axis": "total_amount",
+            "aggregation": "SUM",
+            "sort": "total_amount",
+            "sort_order": "desc",
+            "limit": 10
+          }
+        ]
+      }
+    ],
+    "filters": [
+      {
+        "name": "Date Range",
+        "type": "date_range",
+        "field": "order_date",
+        "default_value": "last_30_days"
+      },
+      {
+        "name": "Customer Segment",
+        "type": "multi_select",
+        "field": "customer_segment",
+        "default_value": "all"
+      },
+      {
+        "name": "Product Category",
+        "type": "multi_select", 
+        "field": "category",
+        "default_value": "all"
+      },
+      {
+        "name": "Order Status",
+        "type": "multi_select",
+        "field": "status",
+        "default_value": "all"
+      }
+    ],
+    "calculated_fields": [
+      {
+        "name": "Revenue Growth Rate",
+        "formula": "((current_period_revenue - previous_period_revenue) / previous_period_revenue) * 100",
+        "data_type": "decimal"
+      },
+      {
+        "name": "Customer Acquisition Cost",
+        "formula": "marketing_spend / new_customers",
+        "data_type": "currency"
+      },
+      {
+        "name": "Customer Lifetime Value",
+        "formula": "avg_order_value * purchase_frequency * customer_lifespan",
+        "data_type": "currency"
+      },
+      {
+        "name": "Inventory Turnover Rate",
+        "formula": "cost_of_goods_sold / average_inventory",
+        "data_type": "decimal"
+      }
+    ],
+    "parameters": {
+      "refresh_schedule": "daily",
+      "data_refresh_time": "06:00 UTC",
+      "cache_settings": {
+        "enabled": true,
+        "ttl_minutes": 60
+      },
+      "sharing_settings": {
+        "public_access": false,
+        "allowed_users": ["analytics-team@company.com"],
+        "allowed_groups": ["business-intelligence"]
+      }
+    }
+  },
+  "data_source_connections": [
+    {
+      "name": "ecommerce-mysql-connection",
+      "type": "RDS",
+      "host": "your-rds-endpoint.amazonaws.com",
+      "port": 3306,
+      "database": "ecommerce_analytics",
+      "username": "admin",
+      "ssl_enabled": true
+    }
+  ],
+  "permissions": [
+    {
+      "principal": "arn:aws:quicksight:us-east-1:123456789012:user/default/analytics-user",
+      "actions": [
+        "quicksight:DescribeDashboard",
+        "quicksight:ListDashboardVersions",
+        "quicksight:UpdateDashboardPermissions",
+        "quicksight:DescribeDashboardPermissions"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,413 @@
+# AWS CloudFormation Template for E-commerce Analytics Platform
+# This template creates a complete AWS infrastructure for the e-commerce analytics project
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'E-commerce Analytics Platform with RDS, S3, Lambda, and QuickSight'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Environment name
+  
+  DatabasePassword:
+    Type: String
+    NoEcho: true
+    Description: Password for the RDS MySQL database
+    MinLength: 8
+    MaxLength: 128
+
+Resources:
+  # VPC and Networking
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-ecommerce-vpc'
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-public-subnet-1'
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-public-subnet-2'
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.3.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-private-subnet-1'
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.4.0/24
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-private-subnet-2'
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-igw'
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-public-routes'
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+  # RDS Database
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for RDS MySQL database
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-db-subnet-group'
+
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for RDS MySQL database
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref LambdaSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-db-security-group'
+
+  MySQLDatabase:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub '${Environment}-ecommerce-mysql'
+      DBName: ecommerce_analytics
+      DBInstanceClass: db.t3.micro
+      Engine: MySQL
+      EngineVersion: '8.0.35'
+      MasterUsername: admin
+      MasterUserPassword: !Ref DatabasePassword
+      AllocatedStorage: 20
+      StorageType: gp2
+      VPCSecurityGroups:
+        - !Ref DatabaseSecurityGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      BackupRetentionPeriod: 7
+      MultiAZ: false
+      PubliclyAccessible: false
+      StorageEncrypted: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-ecommerce-mysql'
+
+  # S3 Buckets
+  DataLakeBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${Environment}-ecommerce-datalake-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: TransitionToIA
+            Status: Enabled
+            Transitions:
+              - StorageClass: STANDARD_IA
+                TransitionInDays: 30
+          - Id: TransitionToGlacier
+            Status: Enabled
+            Transitions:
+              - StorageClass: GLACIER
+                TransitionInDays: 90
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-ecommerce-datalake'
+
+  AnalyticsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${Environment}-ecommerce-analytics-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-ecommerce-analytics'
+
+  # IAM Roles and Policies
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${Environment}-ecommerce-lambda-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub '${DataLakeBucket}/*'
+                  - !Sub '${DataLakeBucket}'
+                  - !Sub '${AnalyticsBucket}/*'
+                  - !Sub '${AnalyticsBucket}'
+        - PolicyName: RDSAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - rds:DescribeDBInstances
+                  - rds:DescribeDBClusters
+                Resource: '*'
+
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Lambda functions
+      VpcId: !Ref VPC
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-lambda-security-group'
+
+  # Lambda Functions
+  DataProcessingFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-ecommerce-data-processor'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroup
+        SubnetIds:
+          - !Ref PrivateSubnet1
+          - !Ref PrivateSubnet2
+      Environment:
+        Variables:
+          DB_HOST: !GetAtt MySQLDatabase.Endpoint.Address
+          DB_NAME: ecommerce_analytics
+          DB_USER: admin
+          S3_BUCKET: !Ref DataLakeBucket
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import pymysql
+          import os
+          from datetime import datetime
+          
+          def lambda_handler(event, context):
+              # Database connection
+              connection = pymysql.connect(
+                  host=os.environ['DB_HOST'],
+                  user=os.environ['DB_USER'],
+                  password=os.environ['DB_PASSWORD'],
+                  database=os.environ['DB_NAME']
+              )
+              
+              # S3 client
+              s3 = boto3.client('s3')
+              
+              try:
+                  # Process analytics data
+                  with connection.cursor() as cursor:
+                      # Run analytics queries
+                      cursor.execute("""
+                          SELECT 
+                              customer_segment,
+                              COUNT(*) as customer_count,
+                              SUM(total_spent) as total_revenue
+                          FROM customers 
+                          GROUP BY customer_segment
+                      """)
+                      
+                      results = cursor.fetchall()
+                      
+                      # Upload to S3
+                      timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                      s3.put_object(
+                          Bucket=os.environ['S3_BUCKET'],
+                          Key=f'analytics/customer_segments_{timestamp}.json',
+                          Body=json.dumps(results, default=str)
+                      )
+                      
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps('Data processing completed successfully')
+                  }
+              except Exception as e:
+                  return {
+                      'statusCode': 500,
+                      'body': json.dumps(f'Error: {str(e)}')
+                  }
+              finally:
+                  connection.close()
+
+  # EventBridge Rule for scheduled processing
+  DataProcessingSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${Environment}-ecommerce-data-processing-schedule'
+      Description: Trigger data processing every hour
+      ScheduleExpression: rate(1 hour)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt DataProcessingFunction.Arn
+          Id: DataProcessingTarget
+
+  DataProcessingPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref DataProcessingFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt DataProcessingSchedule.Arn
+
+  # QuickSight Data Source
+  QuickSightDataSourceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${Environment}-ecommerce-quicksight-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: quicksight.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: QuickSightAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - rds:DescribeDBInstances
+                Resource:
+                  - !Sub '${DataLakeBucket}/*'
+                  - !Sub '${DataLakeBucket}'
+                  - !Sub '${AnalyticsBucket}/*'
+                  - !Sub '${AnalyticsBucket}'
+                  - !Sub 'arn:aws:rds:${AWS::Region}:${AWS::AccountId}:db:${MySQLDatabase}'
+
+Outputs:
+  VPCId:
+    Description: VPC ID
+    Value: !Ref VPC
+    Export:
+      Name: !Sub '${Environment}-VPC-ID'
+
+  DatabaseEndpoint:
+    Description: RDS MySQL Database Endpoint
+    Value: !GetAtt MySQLDatabase.Endpoint.Address
+    Export:
+      Name: !Sub '${Environment}-Database-Endpoint'
+
+  DataLakeBucketName:
+    Description: S3 Data Lake Bucket Name
+    Value: !Ref DataLakeBucket
+    Export:
+      Name: !Sub '${Environment}-DataLake-Bucket'
+
+  AnalyticsBucketName:
+    Description: S3 Analytics Bucket Name
+    Value: !Ref AnalyticsBucket
+    Export:
+      Name: !Sub '${Environment}-Analytics-Bucket'
+
+  LambdaFunctionArn:
+    Description: Data Processing Lambda Function ARN
+    Value: !GetAtt DataProcessingFunction.Arn
+    Export:
+      Name: !Sub '${Environment}-Lambda-Function-ARN'
