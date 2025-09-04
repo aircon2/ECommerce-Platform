@@ -1,11 +1,3 @@
--- E-commerce Analytics Dashboard - Advanced SQL Queries
--- This file contains complex SQL queries demonstrating various SQL skills for analytics
-
--- =============================================================================
--- 1. AGGREGATION QUERIES (SUM, AVG, COUNT)
--- =============================================================================
-
--- 1.1 Total Revenue by Customer Segment
 SELECT 
     c.customer_segment,
     COUNT(DISTINCT c.customer_id) as total_customers,
@@ -19,7 +11,6 @@ LEFT JOIN orders o ON c.customer_id = o.customer_id
 GROUP BY c.customer_segment
 ORDER BY total_revenue DESC;
 
--- 1.2 Monthly Sales Performance
 SELECT 
     DATE_FORMAT(order_date, '%Y-%m') as month,
     COUNT(order_id) as total_orders,
@@ -33,7 +24,6 @@ WHERE order_date >= '2023-01-01'
 GROUP BY DATE_FORMAT(order_date, '%Y-%m')
 ORDER BY month;
 
--- 1.3 Product Performance Metrics
 SELECT 
     p.product_name,
     p.category,
@@ -50,7 +40,6 @@ LEFT JOIN reviews r ON p.product_id = r.product_id
 GROUP BY p.product_id, p.product_name, p.category, p.brand
 ORDER BY total_revenue DESC;
 
--- 1.4 Customer Lifetime Value Analysis
 SELECT 
     c.customer_id,
     CONCAT(c.first_name, ' ', c.last_name) as customer_name,
@@ -66,11 +55,6 @@ LEFT JOIN orders o ON c.customer_id = o.customer_id
 GROUP BY c.customer_id, c.first_name, c.last_name, c.customer_segment
 ORDER BY lifetime_value DESC;
 
--- =============================================================================
--- 2. JOIN QUERIES (INNER, LEFT, RIGHT)
--- =============================================================================
-
--- 2.1 INNER JOIN - Complete Order Details with Customer and Product Info
 SELECT 
     o.order_id,
     o.order_date,
@@ -90,7 +74,6 @@ INNER JOIN products p ON oi.product_id = p.product_id
 WHERE o.status = 'Delivered'
 ORDER BY o.order_date DESC;
 
--- 2.2 LEFT JOIN - All Products with Sales Data (including unsold products)
 SELECT 
     p.product_id,
     p.product_name,
@@ -106,7 +89,6 @@ LEFT JOIN reviews r ON p.product_id = r.product_id
 GROUP BY p.product_id, p.product_name, p.category, p.price
 ORDER BY total_revenue DESC;
 
--- 2.3 RIGHT JOIN - Payment Information with Order Details
 SELECT 
     p.payment_id,
     p.payment_method,
@@ -122,7 +104,6 @@ RIGHT JOIN payments p ON o.order_id = p.order_id
 LEFT JOIN customers c ON o.customer_id = c.customer_id
 ORDER BY p.payment_date DESC;
 
--- 2.4 Complex Multi-table JOIN - Complete Customer Journey
 SELECT 
     c.customer_id,
     CONCAT(c.first_name, ' ', c.last_name) as customer_name,
@@ -145,11 +126,6 @@ LEFT JOIN reviews r ON c.customer_id = r.customer_id AND p.product_id = r.produc
 LEFT JOIN payments pay ON o.order_id = pay.order_id
 ORDER BY c.customer_id, o.order_date DESC;
 
--- =============================================================================
--- 3. WINDOW FUNCTIONS (ROW_NUMBER, RANK, OVER)
--- =============================================================================
-
--- 3.1 Top Customers by Revenue with Ranking
 SELECT 
     customer_id,
     CONCAT(first_name, ' ', last_name) as customer_name,
@@ -162,7 +138,6 @@ SELECT
 FROM customers
 ORDER BY total_spent DESC;
 
--- 3.2 Monthly Sales Ranking by Product Category
 SELECT 
     DATE_FORMAT(o.order_date, '%Y-%m') as month,
     p.category,
@@ -175,7 +150,6 @@ INNER JOIN products p ON oi.product_id = p.product_id
 GROUP BY DATE_FORMAT(o.order_date, '%Y-%m'), p.category
 ORDER BY month, category_rank;
 
--- 3.3 Running Total and Moving Average of Sales
 SELECT 
     order_date,
     total_amount,
@@ -186,7 +160,6 @@ FROM orders
 WHERE order_date >= '2024-01-01'
 ORDER BY order_date;
 
--- 3.4 Customer Order Ranking Within Segments
 SELECT 
     customer_id,
     CONCAT(first_name, ' ', last_name) as customer_name,
@@ -198,7 +171,6 @@ SELECT
 FROM customers
 ORDER BY customer_segment, segment_rank;
 
--- 3.5 Product Performance with Percentile Analysis
 SELECT 
     p.product_name,
     p.category,
@@ -212,11 +184,6 @@ LEFT JOIN order_items oi ON p.product_id = oi.product_id
 GROUP BY p.product_id, p.product_name, p.category
 ORDER BY total_revenue DESC;
 
--- =============================================================================
--- 4. GROUPING AND SUBQUERIES
--- =============================================================================
-
--- 4.1 Customers Who Spent More Than Average
 SELECT 
     c.customer_id,
     CONCAT(c.first_name, ' ', c.last_name) as customer_name,
@@ -228,7 +195,6 @@ FROM customers c
 WHERE c.total_spent > (SELECT AVG(total_spent) FROM customers)
 ORDER BY c.total_spent DESC;
 
--- 4.2 Products with Above-Average Ratings
 SELECT 
     p.product_name,
     p.category,
@@ -241,68 +207,24 @@ GROUP BY p.product_id, p.product_name, p.category
 HAVING AVG(r.rating) > (SELECT AVG(rating) FROM reviews)
 ORDER BY avg_rating DESC;
 
--- 4.3 Monthly Growth Rate Analysis
-SELECT 
-    current_month.month,
-    current_month.monthly_revenue,
-    previous_month.monthly_revenue as prev_month_revenue,
-    ROUND(
-        ((current_month.monthly_revenue - previous_month.monthly_revenue) / previous_month.monthly_revenue) * 100, 2
-    ) as growth_rate_percent
-FROM (
+WITH monthly_customers AS (
     SELECT 
         DATE_FORMAT(order_date, '%Y-%m') as month,
-        SUM(total_amount) as monthly_revenue
+        COUNT(DISTINCT customer_id) as active_customers
     FROM orders
     GROUP BY DATE_FORMAT(order_date, '%Y-%m')
-) current_month
-LEFT JOIN (
-    SELECT 
-        DATE_FORMAT(order_date, '%Y-%m') as month,
-        SUM(total_amount) as monthly_revenue
-    FROM orders
-    GROUP BY DATE_FORMAT(order_date, '%Y-%m')
-) previous_month ON previous_month.month = DATE_FORMAT(
-    DATE_ADD(STR_TO_DATE(CONCAT(current_month.month, '-01'), '%Y-%m-%d'), INTERVAL -1 MONTH), '%Y-%m'
 )
-ORDER BY current_month.month;
-
--- 4.4 Top 3 Products in Each Category
 SELECT 
-    category,
-    product_name,
-    total_revenue,
-    category_rank
-FROM (
-    SELECT 
-        p.category,
-        p.product_name,
-        SUM(oi.total_price) as total_revenue,
-        ROW_NUMBER() OVER (PARTITION BY p.category ORDER BY SUM(oi.total_price) DESC) as category_rank
-    FROM products p
-    LEFT JOIN order_items oi ON p.product_id = oi.product_id
-    GROUP BY p.category, p.product_name
-) ranked_products
-WHERE category_rank <= 3
-ORDER BY category, category_rank;
+    month,
+    active_customers,
+    LAG(active_customers) OVER (ORDER BY month) as prev_month_customers,
+    ROUND(
+        (active_customers - LAG(active_customers) OVER (ORDER BY month)) * 100.0 / 
+        LAG(active_customers) OVER (ORDER BY month), 2
+    ) as growth_rate_percent
+FROM monthly_customers
+ORDER BY month;
 
--- 4.5 Customer Segmentation Analysis with Subqueries
-SELECT 
-    customer_segment,
-    COUNT(*) as customer_count,
-    AVG(total_spent) as avg_spent,
-    MAX(total_spent) as max_spent,
-    MIN(total_spent) as min_spent,
-    COUNT(*) * 100.0 / (SELECT COUNT(*) FROM customers) as percentage_of_total
-FROM customers
-GROUP BY customer_segment
-ORDER BY avg_spent DESC;
-
--- =============================================================================
--- 5. ANALYTICS DASHBOARD QUERIES
--- =============================================================================
-
--- 5.1 Executive Summary Dashboard
 SELECT 
     'Total Customers' as metric,
     COUNT(*) as value,
@@ -339,7 +261,6 @@ SELECT
     NULL
 FROM reviews;
 
--- 5.2 Top 10 Best-Selling Products
 SELECT 
     p.product_name,
     p.category,
@@ -355,7 +276,6 @@ GROUP BY p.product_id, p.product_name, p.category, p.brand
 ORDER BY total_quantity_sold DESC
 LIMIT 10;
 
--- 5.3 Customer Purchase Patterns Analysis
 SELECT 
     c.customer_segment,
     COUNT(DISTINCT c.customer_id) as total_customers,
@@ -368,7 +288,6 @@ LEFT JOIN orders o ON c.customer_id = o.customer_id
 GROUP BY c.customer_segment
 ORDER BY avg_revenue_per_customer DESC;
 
--- 5.4 Sales Trends by Month and Category
 SELECT 
     DATE_FORMAT(o.order_date, '%Y-%m') as month,
     p.category,
@@ -382,7 +301,6 @@ WHERE o.order_date >= '2023-01-01'
 GROUP BY DATE_FORMAT(o.order_date, '%Y-%m'), p.category
 ORDER BY month, revenue DESC;
 
--- 5.5 Payment Method Analysis
 SELECT 
     p.payment_method,
     COUNT(p.payment_id) as transaction_count,
@@ -392,24 +310,3 @@ SELECT
 FROM payments p
 GROUP BY p.payment_method
 ORDER BY total_amount DESC;
-
--- 5.6 Customer Retention Analysis
-SELECT 
-    registration_month,
-    new_customers,
-    returning_customers,
-    ROUND((returning_customers * 100.0 / new_customers), 2) as retention_rate_percent
-FROM (
-    SELECT 
-        DATE_FORMAT(c.registration_date, '%Y-%m') as registration_month,
-        COUNT(DISTINCT c.customer_id) as new_customers,
-        COUNT(DISTINCT CASE 
-            WHEN o.order_date > DATE_ADD(STR_TO_DATE(CONCAT(DATE_FORMAT(c.registration_date, '%Y-%m'), '-01'), '%Y-%m-%d'), INTERVAL 1 MONTH)
-            THEN c.customer_id 
-        END) as returning_customers
-    FROM customers c
-    LEFT JOIN orders o ON c.customer_id = o.customer_id
-    WHERE c.registration_date >= '2023-01-01'
-    GROUP BY DATE_FORMAT(c.registration_date, '%Y-%m')
-) retention_data
-ORDER BY registration_month;

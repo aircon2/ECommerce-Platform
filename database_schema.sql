@@ -1,7 +1,3 @@
--- E-commerce Analytics Dashboard Database Schema
--- This database simulates a fictional e-commerce store with comprehensive analytics capabilities
-
--- Drop tables if they exist (for clean setup)
 DROP TABLE IF EXISTS payments;
 DROP TABLE IF EXISTS reviews;
 DROP TABLE IF EXISTS order_items;
@@ -9,7 +5,6 @@ DROP TABLE IF EXISTS orders;
 DROP TABLE IF EXISTS products;
 DROP TABLE IF EXISTS customers;
 
--- Create Customers table
 CREATE TABLE customers (
     customer_id INT PRIMARY KEY AUTO_INCREMENT,
     first_name VARCHAR(50) NOT NULL,
@@ -27,7 +22,6 @@ CREATE TABLE customers (
     last_purchase_date DATE
 );
 
--- Create Products table
 CREATE TABLE products (
     product_id INT PRIMARY KEY AUTO_INCREMENT,
     product_name VARCHAR(200) NOT NULL,
@@ -44,7 +38,6 @@ CREATE TABLE products (
     dimensions VARCHAR(50)
 );
 
--- Create Orders table
 CREATE TABLE orders (
     order_id INT PRIMARY KEY AUTO_INCREMENT,
     customer_id INT NOT NULL,
@@ -63,7 +56,6 @@ CREATE TABLE orders (
     FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
 );
 
--- Create Order Items table (junction table for orders and products)
 CREATE TABLE order_items (
     order_item_id INT PRIMARY KEY AUTO_INCREMENT,
     order_id INT NOT NULL,
@@ -75,7 +67,6 @@ CREATE TABLE order_items (
     FOREIGN KEY (product_id) REFERENCES products(product_id)
 );
 
--- Create Reviews table
 CREATE TABLE reviews (
     review_id INT PRIMARY KEY AUTO_INCREMENT,
     customer_id INT NOT NULL,
@@ -92,7 +83,6 @@ CREATE TABLE reviews (
     FOREIGN KEY (order_id) REFERENCES orders(order_id)
 );
 
--- Create Payments table
 CREATE TABLE payments (
     payment_id INT PRIMARY KEY AUTO_INCREMENT,
     order_id INT NOT NULL,
@@ -107,7 +97,6 @@ CREATE TABLE payments (
     FOREIGN KEY (order_id) REFERENCES orders(order_id)
 );
 
--- Create indexes for better query performance
 CREATE INDEX idx_customers_email ON customers(email);
 CREATE INDEX idx_customers_segment ON customers(customer_segment);
 CREATE INDEX idx_orders_customer ON orders(customer_id);
